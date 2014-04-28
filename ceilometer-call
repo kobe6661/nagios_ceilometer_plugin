@@ -1,0 +1,78 @@
+#!/bin/bash
+#initialization with default values
+SERVICE='cpu_util'
+THRESHOLD='50.0'
+CRITICAL_THRESHOLD='80.0'
+
+#get openstack token to access ceilometer-api
+export OS_USERNAME="admin"
+export OS_TENANT_NAME="admin"
+export OS_PASSWORD="xifizurich2014"
+export OS_AUTH_URL=http://160.85.4.192:35357/v2.0/
+
+
+
+#function to print the help info
+printusage()
+{
+        echo "This plug-in uses the OpenStack Ceilometer API to let Nagios query Ceilometer metrics of VMs."
+	echo "usage:"
+	echo "ceilometer-call -s metric_name -t nagios_warning_threshold -T nagios_critical_threshold"
+	echo "-h: print this message"
+	echo "-s service: The Ceilometer metric which you want to query"
+	echo "-t threshold: Threshold value which causes Nagios to create a warning message"
+	echo "-T threshold for alert: Threshold value which causes Nagios to send a critical alert message"
+	exit ${EXITPROB}
+}
+
+#parse the arguments
+while getopts ":hs:t:T:" opt
+do
+        case $opt in
+                h )     printusage;;
+                s )     SERVICE=${OPTARG};;
+                t )     THRESHOLD=${OPTARG};;
+                T )     CRITICAL_THRESHOLD=${OPTARG};;
+                ? )     printusage;;
+        esac
+done
+
+
+#sanity check, THRESHOLD must be smaller than CRITICALTHRESHOLD
+
+
+
+############### THE PLUGIN ########
+
+
+
+ITERATOR=$(ceilometer meter-list | grep -w $SERVICE | awk 'END{print NR; end}')
+RETURNCODE=0
+
+for (( C=1; C<=$ITERATOR; C++ ))
+do
+	METER_NAME=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $2 $1; end}}')
+	METER_UNIT=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $4 $1; end}}')
+	RESOURCE_ID=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $5 $1; end}}')
+	ACTUAL_VALUE=$(ceilometer sample-list -m $METER_NAME | grep $RESOURCE_ID | head -4 | tail -1| awk -F '|' '{print $5; end}')
+	if [ $(echo "$ACTUAL_VALUE > $THRESHOLD" | bc) -eq 1 ]
+	then
+		if (( "$RETURNCODE" < "1" ))
+		then
+			RETURNCODE=1
+		fi
+		if [ $(echo "$ACTUAL_VALUE > $CRITICAL_THRESHOLD" | bc) -eq 1 ]
+		then
+			if (( "$RETURNCODE" < "2" ))
+			then
+				RETURNCODE=2
+			fi
+		fi
+	fi
+	STATUS=$(echo "$METER_NAME on $RESOURCE_ID is: $ACTUAL_VALUE $METER_UNIT")
+	echo $STATUS
+done
+
+echo $RETURNCODE
+
+
