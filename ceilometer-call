@@ -54,7 +54,7 @@ do
 	METER_NAME=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $2 $1; end}}')
 	METER_UNIT=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $4 $1; end}}')
 	RESOURCE_ID=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $5 $1; end}}')
-	ACTUAL_VALUE=$(ceilometer sample-list -m $METER_NAME -l 1 | grep $RESOURCE_ID | head -4 | tail -1| awk -F '|' '{print $5; end}')
+	ACTUAL_VALUE=$(ceilometer sample-list -m $METER_NAME -l 100 | grep $RESOURCE_ID | head -4 | tail -1| awk -F '|' '{print $5; end}')
 	if [ $(echo "$ACTUAL_VALUE > $THRESHOLD" | bc) -eq 1 ]
 	then
 		if (( "$RETURNCODE" < "1" ))
