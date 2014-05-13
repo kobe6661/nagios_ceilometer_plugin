@@ -5,10 +5,10 @@ THRESHOLD='50.0'
 CRITICAL_THRESHOLD='80.0'
 
 #get openstack token to access ceilometer-api
-export OS_USERNAME="user"
-export OS_TENANT_NAME="tenant"
-export OS_PASSWORD="password"
-export OS_AUTH_URL=http://yoururl:35357/v2.0/
+export OS_USERNAME="youruser"
+export OS_TENANT_NAME="yourtenant"
+export OS_PASSWORD="yourpassword"
+export OS_AUTH_URL=http://yourkeystoneurl:35357/v2.0/
 
 
 
@@ -44,17 +44,18 @@ done
 
 ############### THE PLUGIN ########
 
+RESOURCE=$(nova list | tail -2 | head -1 |  awk -F '|' '{print $2; end}')
+RESOURCE=$(echo $RESOURCE)
 
-
-ITERATOR=$(ceilometer meter-list | grep -w $SERVICE | awk 'END{print NR; end}')
+ITERATOR=$(ceilometer meter-list -q "resource_id=$RESOURCE" | grep -w $SERVICE | awk 'END{print NR; end}')
 RETURNCODE=0
 
 for (( C=1; C<=$ITERATOR; C++ ))
 do
-	METER_NAME=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $2 $1; end}}')
-	METER_UNIT=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $4 $1; end}}')
-	RESOURCE_ID=$(ceilometer meter-list | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $5 $1; end}}')
-	ACTUAL_VALUE=$(ceilometer sample-list -m $METER_NAME -l 100 | grep $RESOURCE_ID | head -4 | tail -1| awk -F '|' '{print $5; end}')
+	METER_NAME=$(ceilometer meter-list -q "resource_id=$RESOURCE" | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $2 $1; end}}')
+	METER_UNIT=$(ceilometer meter-list -q "resource_id=$RESOURCE" | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $4 $1; end}}')
+	RESOURCE_ID=$(ceilometer meter-list -q "resource_id=$RESOURCE" | grep -w $SERVICE | awk -F '|'  -v var="$C" '{if (NR == var) {print $5 $1; end}}')
+	ACTUAL_VALUE=$(ceilometer sample-list -m $METER_NAME -q "resource_id=$RESOURCE" -l 1 | grep $RESOURCE_ID | head -4 | tail -1| awk -F '|' '{print $5; end}')
 	if [ $(echo "$ACTUAL_VALUE > $THRESHOLD" | bc) -eq 1 ]
 	then
 		if (( "$RETURNCODE" < "1" ))
